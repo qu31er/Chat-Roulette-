@@ -1,7 +1,9 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 import json
+import os
 from typing import Dict, List
-import asyncio
 
 app = FastAPI()
 
@@ -9,15 +11,24 @@ waiting_queue: List[str] = []
 pairs: Dict[str, str] = {}
 connections: Dict[str, WebSocket] = {}
 
-# ===== МГНОВЕННЫЙ HEALTHCHECK =====
+# ===== ОТДАЁМ HTML =====
 @app.get("/")
 async def root():
-    return {"status": "ok"}
+    # Пытаемся найти index.html
+    paths = [
+        "frontend/index.html",
+        "../frontend/index.html",
+        "/app/frontend/index.html"
+    ]
+    for path in paths:
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                return HTMLResponse(content=f.read())
+    return {"status": "ok", "message": "Chat Roulette работает, но фронтенд не найден"}
 
 @app.get("/health")
 async def health():
     return {"status": "ok", "connections": len(connections)}
-# ==================================
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -28,7 +39,6 @@ async def websocket_endpoint(websocket: WebSocket):
     print(f"✅ Клиент: {client_id}")
     await websocket.send_text(json.dumps({"type": "welcome"}))
     
-    # Поиск партнёра
     if waiting_queue:
         partner_id = waiting_queue.pop(0)
         partner_ws = connections.get(partner_id)
