@@ -11,20 +11,58 @@ waiting_queue: List[str] = []
 pairs: Dict[str, str] = {}
 connections: Dict[str, WebSocket] = {}
 
+# ===== РАЗДАЧА СТАТИКИ (CSS, JS) =====
+# Пытаемся найти папку frontend в разных местах
+frontend_paths = [
+    "/app/frontend",
+    "./frontend",
+    "../frontend",
+    os.path.join(os.path.dirname(__file__), "frontend")
+]
+
+frontend_path = None
+for path in frontend_paths:
+    if os.path.exists(path) and os.path.isdir(path):
+        frontend_path = path
+        break
+
+if frontend_path:
+    print(f"📁 Фронтенд найден: {frontend_path}")
+    app.mount("/static", StaticFiles(directory=frontend_path), name="static")
+else:
+    print("❌ Папка frontend не найдена!")
+    # Создаём папку если нет
+    os.makedirs("frontend", exist_ok=True)
+
 # ===== ОТДАЁМ HTML =====
 @app.get("/")
 async def root():
-    # Пытаемся найти index.html
-    paths = [
-        "frontend/index.html",
-        "../frontend/index.html",
-        "/app/frontend/index.html"
+    # Ищем index.html
+    html_paths = [
+        "/app/frontend/index.html",
+        "./frontend/index.html",
+        "../frontend/index.html"
     ]
-    for path in paths:
+    for path in html_paths:
         if os.path.exists(path):
             with open(path, "r", encoding="utf-8") as f:
-                return HTMLResponse(content=f.read())
-    return {"status": "ok", "message": "Chat Roulette работает, но фронтенд не найден"}
+                html = f.read()
+                # Заменяем ссылки на статику
+                html = html.replace('href="style.css"', 'href="/static/style.css"')
+                html = html.replace('src="app.js"', 'src="/static/app.js"')
+                return HTMLResponse(content=html)
+    
+    # Если index.html нет, показываем простую страницу
+    return HTMLResponse("""
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="UTF-8"><title>Чат-рулетка</title></head>
+    <body>
+        <h1>🚀 Чат-рулетка работает!</h1>
+        <p>Но фронтенд не найден. Проверьте папку frontend.</p>
+    </body>
+    </html>
+    """)
 
 @app.get("/health")
 async def health():
@@ -47,12 +85,14 @@ async def websocket_endpoint(websocket: WebSocket):
             pairs[partner_id] = client_id
             await websocket.send_text(json.dumps({"type": "paired"}))
             await partner_ws.send_text(json.dumps({"type": "paired"}))
+            print(f"🎯 Пара: {client_id} <-> {partner_id}")
         else:
             waiting_queue.append(client_id)
             await websocket.send_text(json.dumps({"type": "waiting"}))
     else:
         waiting_queue.append(client_id)
         await websocket.send_text(json.dumps({"type": "waiting"}))
+        print(f"⏳ Очередь: {client_id}")
     
     try:
         while True:
