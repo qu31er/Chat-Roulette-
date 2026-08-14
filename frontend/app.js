@@ -1,13 +1,12 @@
-// Автоматическое определение WebSocket URL
-const WS_URL = window.location.hostname === 'localhost' 
-    ? 'ws://localhost:8887/ws' 
-    : `wss://${window.location.hostname}/ws`;
+// WebSocket подключение
+const WS_URL = `wss://${window.location.host}/ws`;
+console.log('🔗 WebSocket URL:', WS_URL);
 
 const ws = new WebSocket(WS_URL);
 const localVideo = document.getElementById('local-video');
 const remoteVideo = document.getElementById('remote-video');
 const statusText = document.getElementById('status-text');
-const statusDot = document.querySelector('.dot');
+const statusDot = document.getElementById('status-dot');
 const timerEl = document.getElementById('timer');
 const searchOverlay = document.getElementById('search-overlay');
 const micBtn = document.getElementById('mic-btn');
@@ -29,6 +28,7 @@ const rtcConfig = {
     ]
 };
 
+// ===== ТАЙМЕР =====
 function startTimer() {
     seconds = 0;
     clearInterval(timerInterval);
@@ -45,6 +45,7 @@ function stopTimer() {
     timerEl.textContent = '⏱ 00:00';
 }
 
+// ===== КАМЕРА =====
 async function initLocalStream() {
     try {
         localStream = await navigator.mediaDevices.getUserMedia({
@@ -53,35 +54,38 @@ async function initLocalStream() {
         });
         localVideo.srcObject = localStream;
         updateUI('searching');
+        console.log('✅ Камера включена');
     } catch (e) {
         statusText.textContent = '❌ Нет доступа к камере';
-        console.error(e);
+        console.error('❌ Ошибка камеры:', e);
         alert('Пожалуйста, разрешите доступ к камере и микрофону');
     }
 }
 
+// ===== ОБНОВЛЕНИЕ UI =====
 function updateUI(state, message) {
+    console.log('📌 UI:', state, message);
     switch(state) {
         case 'searching':
             statusText.textContent = message || 'Поиск собеседника...';
-            statusDot.className = 'dot searching';
-            searchOverlay.classList.add('active');
+            if (statusDot) statusDot.className = 'dot searching';
+            if (searchOverlay) searchOverlay.classList.add('active');
             isConnected = false;
             isSearching = true;
             stopTimer();
             break;
         case 'connected':
             statusText.textContent = message || 'В разговоре';
-            statusDot.className = 'dot connected';
-            searchOverlay.classList.remove('active');
+            if (statusDot) statusDot.className = 'dot connected';
+            if (searchOverlay) searchOverlay.classList.remove('active');
             isConnected = true;
             isSearching = false;
             startTimer();
             break;
         case 'disconnected':
             statusText.textContent = message || 'Разговор завершён';
-            statusDot.className = 'dot searching';
-            searchOverlay.classList.add('active');
+            if (statusDot) statusDot.className = 'dot searching';
+            if (searchOverlay) searchOverlay.classList.add('active');
             isConnected = false;
             isSearching = true;
             stopTimer();
@@ -89,6 +93,7 @@ function updateUI(state, message) {
     }
 }
 
+// ===== WEBRTC =====
 function createPeerConnection() {
     const pc = new RTCPeerConnection(rtcConfig);
     
@@ -103,10 +108,11 @@ function createPeerConnection() {
     
     pc.ontrack = (e) => {
         remoteVideo.srcObject = e.streams[0];
+        console.log('🎥 Видео собеседника получено');
     };
     
     pc.onconnectionstatechange = () => {
-        console.log('Connection state:', pc.connectionState);
+        console.log('🔌 Состояние:', pc.connectionState);
         if (pc.connectionState === 'disconnected' || 
             pc.connectionState === 'failed') {
             handleDisconnect('Соединение потеряно');
@@ -133,11 +139,13 @@ async function createOffer() {
             type: 'offer',
             sdp: offer
         }));
+        console.log('📤 Offer отправлен');
     } catch (e) {
-        console.error('Ошибка создания offer:', e);
+        console.error('❌ Ошибка offer:', e);
     }
 }
 
+// ===== WEBSOCKET =====
 ws.onopen = () => {
     console.log('✅ WebSocket подключен');
     statusText.textContent = 'Подключено к серверу';
@@ -146,11 +154,11 @@ ws.onopen = () => {
 ws.onmessage = async (event) => {
     try {
         const data = JSON.parse(event.data);
-        console.log('Получено:', data.type);
+        console.log('📨 Получено:', data.type);
         
         switch(data.type) {
             case 'welcome':
-                console.log(data.message);
+                console.log('👋 Приветствие от сервера');
                 break;
                 
             case 'waiting':
@@ -174,6 +182,7 @@ ws.onmessage = async (event) => {
                     sdp: answer
                 }));
                 updateUI('connected', 'Собеседник найден!');
+                console.log('📤 Answer отправлен');
                 break;
                 
             case 'answer':
@@ -197,10 +206,10 @@ ws.onmessage = async (event) => {
                 break;
                 
             default:
-                console.log('Неизвестный тип:', data.type);
+                console.log('⚠️ Неизвестный тип:', data.type);
         }
     } catch (e) {
-        console.error('Ошибка обработки:', e);
+        console.error('❌ Ошибка обработки:', e);
     }
 };
 
@@ -210,7 +219,7 @@ ws.onclose = () => {
 };
 
 ws.onerror = (error) => {
-    console.error('WebSocket ошибка:', error);
+    console.error('❌ WebSocket ошибка:', error);
     statusText.textContent = '⚠️ Ошибка соединения';
 };
 
@@ -221,54 +230,58 @@ function handleDisconnect(message = 'Разговор завершён') {
     }
     remoteVideo.srcObject = null;
     updateUI('disconnected', message);
-    setTimeout(() => {
-        if (ws.readyState === WebSocket.OPEN && !isSearching) {
-            ws.send(JSON.stringify({ type: 'find' }));
-        }
-    }, 1000);
 }
 
-micBtn.addEventListener('click', () => {
-    if (!localStream) return;
-    const audioTrack = localStream.getAudioTracks()[0];
-    if (!audioTrack) return;
-    
-    isMuted = !isMuted;
-    audioTrack.enabled = !isMuted;
-    micBtn.classList.toggle('muted', isMuted);
-    
-    const icon = micBtn.querySelector('svg');
-    if (isMuted) {
-        icon.innerHTML = `<path d="M12 16c-2.206 0-4-1.794-4-4V6c0-2.206 1.794-4 4-4s4 1.794 4 4v6c0 2.206-1.794 4-4 4zm8-4h-2c0 2.607-1.67 4.82-4 5.65V20h-4v-2.35c-2.33-.83-4-3.043-4-5.65H4c0 3.526 2.608 6.443 6 6.93V20h4v-2.07c3.392-.487 6-3.404 6-6.93z"/><line x1="3" y1="3" x2="21" y2="21" stroke="currentColor" stroke-width="2"/>`;
-    } else {
-        icon.innerHTML = `<path d="M12 16c-2.206 0-4-1.794-4-4V6c0-2.206 1.794-4 4-4s4 1.794 4 4v6c0 2.206-1.794 4-4 4zm8-4h-2c0 2.607-1.67 4.82-4 5.65V20h-4v-2.35c-2.33-.83-4-3.043-4-5.65H4c0 3.526 2.608 6.443 6 6.93V20h4v-2.07c3.392-.487 6-3.404 6-6.93z"/>`;
-    }
-});
+// ===== КНОПКИ =====
+// Микрофон
+if (micBtn) {
+    micBtn.addEventListener('click', function() {
+        console.log('🔊 Кнопка микрофона нажата');
+        if (!localStream) return;
+        const audioTrack = localStream.getAudioTracks()[0];
+        if (!audioTrack) return;
+        
+        isMuted = !isMuted;
+        audioTrack.enabled = !isMuted;
+        this.classList.toggle('muted', isMuted);
+        console.log('🎤 Микрофон:', isMuted ? 'ВЫКЛ' : 'ВКЛ');
+    });
+}
 
-nextBtn.addEventListener('click', () => {
-    if (isConnected) {
-        if (peerConnection) {
-            peerConnection.close();
-            peerConnection = null;
+// Новый собеседник
+if (nextBtn) {
+    nextBtn.addEventListener('click', function() {
+        console.log('🔄 Кнопка "Новый" нажата');
+        if (isConnected) {
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
+            remoteVideo.srcObject = null;
+            ws.send(JSON.stringify({ type: 'leave' }));
         }
-        remoteVideo.srcObject = null;
-        ws.send(JSON.stringify({ type: 'leave' }));
-    }
-    updateUI('searching', 'Поиск нового собеседника...');
-    if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'find' }));
-    }
-});
+        updateUI('searching', 'Поиск нового собеседника...');
+        if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'find' }));
+        }
+    });
+}
 
-hangupBtn.addEventListener('click', () => {
-    if (isConnected) {
-        ws.send(JSON.stringify({ type: 'leave' }));
-        handleDisconnect('Вы завершили разговор');
-    } else if (isSearching) {
-        ws.send(JSON.stringify({ type: 'stop_search' }));
-        updateUI('searching', 'Поиск остановлен');
-    }
-});
+// Завершить
+if (hangupBtn) {
+    hangupBtn.addEventListener('click', function() {
+        console.log('📞 Кнопка "Завершить" нажата');
+        if (isConnected) {
+            ws.send(JSON.stringify({ type: 'leave' }));
+            handleDisconnect('Вы завершили разговор');
+        } else if (isSearching) {
+            ws.send(JSON.stringify({ type: 'stop_search' }));
+            updateUI('searching', 'Поиск остановлен');
+        }
+    });
+}
 
+// ===== ЗАПУСК =====
+console.log('🚀 Запуск приложения...');
 initLocalStream();
 updateUI('searching', 'Поиск собеседника...');
