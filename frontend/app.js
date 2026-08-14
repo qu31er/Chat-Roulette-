@@ -1,6 +1,7 @@
+// Автоматическое определение WebSocket URL
 const WS_URL = window.location.hostname === 'localhost' 
-    ? 'ws://localhost:8887' 
-    : `wss://${window.location.hostname}`;
+    ? 'ws://localhost:8887/ws' 
+    : `wss://${window.location.hostname}/ws`;
 
 const ws = new WebSocket(WS_URL);
 const localVideo = document.getElementById('local-video');
@@ -53,8 +54,9 @@ async function initLocalStream() {
         localVideo.srcObject = localStream;
         updateUI('searching');
     } catch (e) {
-        statusText.textContent = '❌ Нет доступа';
+        statusText.textContent = '❌ Нет доступа к камере';
         console.error(e);
+        alert('Пожалуйста, разрешите доступ к камере и микрофону');
     }
 }
 
@@ -104,6 +106,7 @@ function createPeerConnection() {
     };
     
     pc.onconnectionstatechange = () => {
+        console.log('Connection state:', pc.connectionState);
         if (pc.connectionState === 'disconnected' || 
             pc.connectionState === 'failed') {
             handleDisconnect('Соединение потеряно');
@@ -131,15 +134,25 @@ async function createOffer() {
             sdp: offer
         }));
     } catch (e) {
-        console.error(e);
+        console.error('Ошибка создания offer:', e);
     }
 }
+
+ws.onopen = () => {
+    console.log('✅ WebSocket подключен');
+    statusText.textContent = 'Подключено к серверу';
+};
 
 ws.onmessage = async (event) => {
     try {
         const data = JSON.parse(event.data);
+        console.log('Получено:', data.type);
         
         switch(data.type) {
+            case 'welcome':
+                console.log(data.message);
+                break;
+                
             case 'waiting':
                 updateUI('searching', 'Ожидание собеседника...');
                 break;
@@ -182,14 +195,23 @@ ws.onmessage = async (event) => {
             case 'search_stopped':
                 updateUI('searching', 'Поиск остановлен');
                 break;
+                
+            default:
+                console.log('Неизвестный тип:', data.type);
         }
     } catch (e) {
-        console.error(e);
+        console.error('Ошибка обработки:', e);
     }
 };
 
 ws.onclose = () => {
+    console.log('❌ WebSocket закрыт');
     handleDisconnect('Соединение потеряно');
+};
+
+ws.onerror = (error) => {
+    console.error('WebSocket ошибка:', error);
+    statusText.textContent = '⚠️ Ошибка соединения';
 };
 
 function handleDisconnect(message = 'Разговор завершён') {
