@@ -24,7 +24,8 @@ let isSearching = true;
 const rtcConfig = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' }
     ]
 };
 
@@ -49,12 +50,22 @@ function stopTimer() {
 async function initLocalStream() {
     try {
         localStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'user' },
-            audio: { echoCancellation: true, noiseSuppression: true }
+            video: { 
+                facingMode: 'user',
+                width: { ideal: 640 },
+                height: { ideal: 480 }
+            },
+            audio: { 
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+            }
         });
         localVideo.srcObject = localStream;
+        console.log('✅ Камера включена, треков:', localStream.getTracks().length);
+        console.log('🎤 Аудио треки:', localStream.getAudioTracks().length);
+        console.log('📹 Видео треки:', localStream.getVideoTracks().length);
         updateUI('searching');
-        console.log('✅ Камера включена');
     } catch (e) {
         statusText.textContent = '❌ Нет доступа к камере';
         console.error('❌ Ошибка камеры:', e);
@@ -93,9 +104,17 @@ function updateUI(state, message) {
     }
 }
 
-// ===== WEBRTC =====
+// ===== СОЗДАНИЕ ПИРА (ВАЖНО!) =====
 function createPeerConnection() {
     const pc = new RTCPeerConnection(rtcConfig);
+    
+    // ===== ДОБАВЛЯЕМ ТРЕКИ В ПИР =====
+    if (localStream) {
+        localStream.getTracks().forEach(track => {
+            pc.addTrack(track, localStream);
+            console.log('➕ Добавлен трек:', track.kind);
+        });
+    }
     
     pc.onicecandidate = (e) => {
         if (e.candidate) {
@@ -103,37 +122,47 @@ function createPeerConnection() {
                 type: 'ice',
                 candidate: e.candidate
             }));
+            console.log('❄️ ICE кандидат отправлен');
         }
     };
     
     pc.ontrack = (e) => {
-        remoteVideo.srcObject = e.streams[0];
-        console.log('🎥 Видео собеседника получено');
+        console.log('🎥 Получен трек от собеседника:', e.track.kind);
+        if (e.streams && e.streams[0]) {
+            remoteVideo.srcObject = e.streams[0];
+            console.log('✅ Видео собеседника подключено!');
+        }
     };
     
     pc.onconnectionstatechange = () => {
         console.log('🔌 Состояние:', pc.connectionState);
+        if (pc.connectionState === 'connected') {
+            console.log('✅ WebRTC соединение установлено!');
+        }
         if (pc.connectionState === 'disconnected' || 
             pc.connectionState === 'failed') {
             handleDisconnect('Соединение потеряно');
         }
     };
     
-    if (localStream) {
-        localStream.getTracks().forEach(track => {
-            pc.addTrack(track, localStream);
-        });
-    }
+    pc.oniceconnectionstatechange = () => {
+        console.log('❄️ ICE состояние:', pc.iceConnectionState);
+    };
     
     return pc;
 }
 
+// ===== СОЗДАНИЕ OFFER =====
 async function createOffer() {
     if (!peerConnection) {
         peerConnection = createPeerConnection();
     }
     try {
-        const offer = await peerConnection.createOffer();
+        console.log('📤 Создаём offer...');
+        const offer = await peerConnection.createOffer({
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: true
+        });
         await peerConnection.setLocalDescription(offer);
         ws.send(JSON.stringify({
             type: 'offer',
@@ -166,34 +195,48 @@ ws.onmessage = async (event) => {
                 break;
                 
             case 'paired':
+                console.log('🎯 СОБЕСЕДНИК НАЙДЕН!');
                 updateUI('connected', 'Собеседник найден!');
-                await createOffer();
+                // Создаём offer после пары
+                setTimeout(async () => {
+                    await createOffer();
+                }, 500);
                 break;
                 
             case 'offer':
+                console.log('📨 Получен offer');
                 if (!peerConnection) {
                     peerConnection = createPeerConnection();
                 }
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
-                const answer = await peerConnection.createAnswer();
+                console.log('✅ RemoteDescription установлен');
+                
+                const answer = await peerConnection.createAnswer({
+                    offerToReceiveAudio: true,
+                    offerToReceiveVideo: true
+                });
                 await peerConnection.setLocalDescription(answer);
                 ws.send(JSON.stringify({
                     type: 'answer',
                     sdp: answer
                 }));
-                updateUI('connected', 'Собеседник найден!');
                 console.log('📤 Answer отправлен');
+                updateUI('connected', 'Собеседник найден!');
                 break;
                 
             case 'answer':
+                console.log('📨 Получен answer');
                 if (peerConnection) {
                     await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
+                    console.log('✅ RemoteDescription (answer) установлен');
                 }
                 break;
                 
             case 'ice':
+                console.log('❄️ Получен ICE кандидат');
                 if (peerConnection) {
                     await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                    console.log('✅ ICE кандидат добавлен');
                 }
                 break;
                 
