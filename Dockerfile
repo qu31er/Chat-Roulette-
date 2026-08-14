@@ -4,7 +4,10 @@ WORKDIR /app
 
 RUN pip install --no-cache-dir fastapi uvicorn websockets
 
+# Копируем бэкенд
 COPY main.py .
 
-# Минимальный запуск для быстрого старта
+# Копируем фронтенд
+COPY frontend /app/frontend
+
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8887"]
