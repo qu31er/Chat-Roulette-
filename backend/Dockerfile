@@ -1,12 +1,12 @@
-FROM maven:3.9-eclipse-temurin-17 AS build
-WORKDIR /app
-COPY pom.xml .
-RUN mvn dependency:go-offline
-COPY src ./src
-RUN mvn clean package -DskipTests
+FROM python:3.11-slim
 
-FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
-COPY --from=build /app/target/chat-roulette-1.0.0.jar app.jar
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY server.py .
+
 EXPOSE 8887
-ENTRYPOINT ["java", "-jar", "app.jar"]
+
+CMD ["python", "server.py"]
