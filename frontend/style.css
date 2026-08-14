@@ -119,8 +119,10 @@ video {
     object-fit: cover;
     background: #1a1a2e;
     transform: scaleX(-1);
+    z-index: 2;
 }
 
+/* ===== ОВЕРЛЕЙ ПОИСКА (БЕЗ РАЗМЫТИЯ) ===== */
 #search-overlay {
     position: absolute;
     top: 0;
@@ -131,8 +133,7 @@ video {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    background: rgba(10, 10, 26, 0.85);
-    backdrop-filter: blur(8px);
+    background: rgba(10, 10, 26, 0.7);  /* УБРАЛИ РАЗМЫТИЕ */
     z-index: 5;
 }
 
@@ -160,6 +161,7 @@ video {
     font-weight: 500;
 }
 
+/* ===== КНОПКИ ===== */
 #controls {
     position: absolute;
     bottom: 32px;
