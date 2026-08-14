@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Чат-рулетка</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <div id="top-bar">
+            <div id="status-indicator">
+                <span class="dot searching"></span>
+                <span id="status-text">Поиск собеседника...</span>
+            </div>
+            <div id="timer">⏱ 00:00</div>
+        </div>
+
+        <div id="video-container">
+            <video id="remote-video" autoplay playsinline></video>
+            <video id="local-video" autoplay muted playsinline></video>
+            
+            <div id="search-overlay" class="active">
+                <div class="spinner"></div>
+                <p>Ищем собеседника...</p>
+            </div>
+        </div>
+
+        <div id="controls">
+            <button id="mic-btn" class="control-btn active">
+                <svg viewBox="0 0 24 24" width="28" height="28">
+                    <path d="M12 16c-2.206 0-4-1.794-4-4V6c0-2.206 1.794-4 4-4s4 1.794 4 4v6c0 2.206-1.794 4-4 4zm8-4h-2c0 2.607-1.67 4.82-4 5.65V20h-4v-2.35c-2.33-.83-4-3.043-4-5.65H4c0 3.526 2.608 6.443 6 6.93V20h4v-2.07c3.392-.487 6-3.404 6-6.93z"/>
+                </svg>
+            </button>
+
+            <button id="next-btn" class="control-btn primary">
+                <svg viewBox="0 0 24 24" width="24" height="24">
+                    <path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/>
+                </svg>
+                <span>Новый</span>
+            </button>
+
+            <button id="hangup-btn" class="control-btn danger">
+                <svg viewBox="0 0 24 24" width="28" height="28">
+                    <path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08a.956.956 0 0 1-.29-.7c0-.28.11-.53.29-.71C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.67c.18.18.29.43.29.71 0 .28-.11.53-.29.71l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.11-.7-.28-.79-.73-1.68-1.36-2.66-1.85-.33-.16-.56-.5-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
