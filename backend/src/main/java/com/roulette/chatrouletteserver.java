@@ -141,6 +141,6 @@ public class ChatRouletteServer extends WebSocketServer {
         
         ChatRouletteServer server = new ChatRouletteServer(port);
         server.start();
-        System.out.println("🚀 Сервер запущен на порту " + port);
+        System.out.println(" Сервер запущен на порту " + port);
     }
 }
